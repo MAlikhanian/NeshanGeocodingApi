@@ -1,0 +1,49 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: neshangeocodingapi-config
+  namespace: alborzdc-neshan-geo-coding-api
+data:
+  appsettings.Docker.json: |
+    {
+      "ConnectionStrings": {
+        "DefaultConnection": "Data Source=/app/data/neshan_geocoding.db"
+      },
+      "Neshan": {
+        "ApiKey": "service.6fd43f8d8a3642cea7416a43a9f91e23",
+        "RateLimit": {
+          "RequestsPerMinute": 60,
+          "DelayBetweenRequests": 1000,
+          "MaxConcurrentRequests": 5,
+          "RetryOnRateLimit": true,
+          "MaxRetries": 3,
+          "RetryDelay": 2000
+        },
+        "ProcessingLimits": {
+          "MaxAddressesPerFile": 50,
+          "EnableProcessingLimits": true,
+          "SkipRemainingAddresses": true,
+          "ShowLimitWarning": true
+        }
+      },
+      "Logging": {
+        "LogLevel": {
+          "Default": "Information",
+          "Microsoft.AspNetCore": "Warning",
+          "Microsoft.EntityFrameworkCore": "Warning"
+        }
+      },
+      "AllowedHosts": "*"
+    }
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: neshangeocodingapi-secrets
+  namespace: alborzdc-neshan-geo-coding-api
+type: Opaque
+data:
+  # Base64 encoded API key (replace with your actual encoded key)
+  neshan-api-key: c2VydmljZS42ZmQ0M2Y4ZDhhMzY0MmNlYTc0MTZhNDNhOWY5MWUyMw==
+  # Base64 encoded database connection string
+  db-connection-string: RGF0YSBTb3VyY2U9L2FwcC9kYXRhL25lc2hhbl9nZW9jb2RpbmcuZGI=

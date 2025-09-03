@@ -4,8 +4,17 @@
 FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS base
 USER $APP_UID
 WORKDIR /app
+
+# Create data directory for SQLite database
+RUN mkdir -p /app/data
+
+# Create certs directory for SSL certificates
+RUN mkdir -p /app/certs
+
+# Set environment to Docker
+ENV ASPNETCORE_ENVIRONMENT=Docker
+
 EXPOSE 8080
-EXPOSE 8081
 
 
 # This stage is used to build the service project
@@ -26,5 +35,19 @@ RUN dotnet publish "./NeshanGeocodingApi.csproj" -c $BUILD_CONFIGURATION -o /app
 # This stage is used in production or when running from VS in regular mode (Default when not using the Debug configuration)
 FROM base AS final
 WORKDIR /app
+
+# Create data directory for SQLite database
+RUN mkdir -p /app/data
+
+# Create certs directory for SSL certificates
+RUN mkdir -p /app/certs
+
+# Set environment to Docker
+ENV ASPNETCORE_ENVIRONMENT=Docker
+
 COPY --from=publish /app/publish .
+
+# Copy SSL certificate if it exists (optional)
+COPY certs/ /app/certs/
+
 ENTRYPOINT ["dotnet", "NeshanGeocodingApi.dll"]

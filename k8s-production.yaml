@@ -1,0 +1,185 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: neshangeocodingapi
+  namespace: alborzdc-neshan-geo-coding-api
+  labels:
+    app: neshangeocodingapi
+    version: v1.0.0
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: neshangeocodingapi
+  template:
+    metadata:
+      labels:
+        app: neshangeocodingapi
+        version: v1.0.0
+    spec:
+      containers:
+      - name: neshangeocodingapi
+        image: alikhanian/neshangeocodingapi:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        env:
+        - name: ASPNETCORE_ENVIRONMENT
+          value: "Docker"
+        - name: ASPNETCORE_URLS
+          value: "http://+:8080"
+        - name: TZ
+          value: "UTC"
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /index.html
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /index.html
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        volumeMounts:
+        - name: data-volume
+          mountPath: /app/data
+        - name: exports-volume
+          mountPath: /app/wwwroot/exports
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          runAsUser: 1000
+          capabilities:
+            drop:
+            - ALL
+      volumes:
+      - name: data-volume
+        persistentVolumeClaim:
+          claimName: neshangeocodingapi-data-pvc
+      - name: exports-volume
+        persistentVolumeClaim:
+          claimName: neshangeocodingapi-exports-pvc
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: neshangeocodingapi-service
+  namespace: alborzdc-neshan-geo-coding-api
+  labels:
+    app: neshangeocodingapi
+spec:
+  selector:
+    app: neshangeocodingapi
+  ports:
+  - name: http
+    port: 80
+    targetPort: 8080
+    protocol: TCP
+  type: ClusterIP
+  sessionAffinity: None
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: neshangeocodingapi-data-pvc
+  namespace: alborzdc-neshan-geo-coding-api
+spec:
+  storageClassName: ceph-block        # RWO (single-writer)
+  accessModes: [ "ReadWriteOnce" ]
+  resources:
+    requests:
+      storage: 2Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: neshangeocodingapi-exports-pvc
+  namespace: alborzdc-neshan-geo-coding-api
+spec:
+  storageClassName: ceph-filesystem   # RWX (shared)
+  accessModes: [ "ReadWriteMany" ]
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: neshangeocodingapi-ingress
+  namespace: alborzdc-neshan-geo-coding-api
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - geocode.alborzdcoffice.ir
+    secretName: neshangeocodingapi-tls
+  rules:
+  - host: geocode.alborzdcoffice.ir
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: neshangeocodingapi-service
+            port:
+              number: 80
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: neshangeocodingapi-hpa
+  namespace: alborzdc-neshan-geo-coding-api
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: neshangeocodingapi
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80

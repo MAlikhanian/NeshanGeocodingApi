@@ -1,0 +1,132 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: neshangeocodingapi
+  namespace: alborzDC
+  labels:
+    app: neshangeocodingapi
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: neshangeocodingapi
+  template:
+    metadata:
+      labels:
+        app: neshangeocodingapi
+    spec:
+      containers:
+      - name: neshangeocodingapi
+        image: alikhanian/neshangeocodingapi:latest
+        ports:
+        - containerPort: 8080
+          name: http
+        env:
+        - name: ASPNETCORE_ENVIRONMENT
+          value: "Docker"
+        - name: ASPNETCORE_URLS
+          value: "http://+:8080"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /index.html
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /index.html
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        volumeMounts:
+        - name: data-volume
+          mountPath: /app/data
+        - name: exports-volume
+          mountPath: /app/wwwroot/exports
+      volumes:
+      - name: data-volume
+        persistentVolumeClaim:
+          claimName: neshangeocodingapi-data-pvc
+      - name: exports-volume
+        persistentVolumeClaim:
+          claimName: neshangeocodingapi-exports-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: neshangeocodingapi-service
+  namespace: alborzDC
+  labels:
+    app: neshangeocodingapi
+spec:
+  selector:
+    app: neshangeocodingapi
+  ports:
+  - name: http
+    port: 80
+    targetPort: 8080
+    protocol: TCP
+  type: ClusterIP
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: neshangeocodingapi-data-pvc
+  namespace: alborzDC
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: standard
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: neshangeocodingapi-exports-pvc
+  namespace: alborzDC
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: standard
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: neshangeocodingapi-ingress
+  namespace: alborzDC
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - geocode.alborzdcoffice.ir
+    secretName: neshangeocodingapi-tls
+  rules:
+  - host: geocode.alborzdcoffice.ir
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: neshangeocodingapi-service
+            port:
+              number: 80
