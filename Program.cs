@@ -102,10 +102,20 @@ app.UseAuthorization();
 app.MapControllers();
 
 // Ensure database is created
-using (var scope = app.Services.CreateScope())
+try
 {
-    var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-    context.Database.EnsureCreated();
+    using (var scope = app.Services.CreateScope())
+    {
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        context.Database.EnsureCreated();
+        Console.WriteLine("Database initialization completed successfully");
+    }
+}
+catch (Exception ex)
+{
+    Console.WriteLine($"Database initialization failed: {ex.Message}");
+    Console.WriteLine($"Stack trace: {ex.StackTrace}");
+    throw;
 }
 
 app.Run();

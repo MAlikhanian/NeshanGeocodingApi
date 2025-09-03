@@ -25,7 +25,7 @@ spec:
       containers:
       - name: neshangeocodingapi
         image: alikhanian/neshangeocodingapi:latest
-        imagePullPolicy: IfNotPresent
+        imagePullPolicy: Always
         ports:
         - containerPort: 8080
           name: http
@@ -49,19 +49,19 @@ spec:
             path: /index.html
             port: 8080
             scheme: HTTP
-          initialDelaySeconds: 60
+          initialDelaySeconds: 90
           periodSeconds: 30
-          timeoutSeconds: 10
-          failureThreshold: 3
+          timeoutSeconds: 15
+          failureThreshold: 5
         readinessProbe:
           httpGet:
             path: /index.html
             port: 8080
             scheme: HTTP
-          initialDelaySeconds: 30
-          periodSeconds: 10
-          timeoutSeconds: 5
-          failureThreshold: 3
+          initialDelaySeconds: 60
+          periodSeconds: 15
+          timeoutSeconds: 10
+          failureThreshold: 5
         volumeMounts:
         - name: data-volume
           mountPath: /app/data
@@ -69,8 +69,9 @@ spec:
           mountPath: /app/wwwroot/exports
         securityContext:
           allowPrivilegeEscalation: false
-          runAsNonRoot: true
-          runAsUser: 1000
+          runAsNonRoot: false
+          runAsUser: 0
+          runAsGroup: 0
           capabilities:
             drop:
             - ALL
@@ -132,16 +133,15 @@ metadata:
   name: neshangeocodingapi-ingress
   namespace: alborzdc-neshan-geo-coding-api
   annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /
-    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    haproxy.org/ssl-redirect: "false"
     cert-manager.io/cluster-issuer: "letsencrypt-prod"
-    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
-    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
-    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
-    nginx.ingress.kubernetes.io/rate-limit: "100"
-    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+    haproxy.org/proxy-body-size: "50m"
+    haproxy.org/proxy-read-timeout: "300"
+    haproxy.org/proxy-send-timeout: "300"
+    haproxy.org/rate-limit: "100"
+    haproxy.org/rate-limit-window: "1m"
 spec:
-  ingressClassName: nginx
+  ingressClassName: haproxy
   tls:
   - hosts:
     - geocode.alborzdcoffice.ir
@@ -150,6 +150,13 @@ spec:
   - host: geocode.alborzdcoffice.ir
     http:
       paths:
+      - path: /.well-known/acme-challenge
+        pathType: Prefix
+        backend:
+          service:
+            name: cm-acme-http-solver-z6r29
+            port:
+              number: 8089
       - path: /
         pathType: Prefix
         backend:
