@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neshan Geocoding API Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input[type="file"], button {
+            padding: 10px;
+            margin: 5px 0;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .result {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 3px;
+            white-space: pre-wrap;
+        }
+        .success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .info {
+            background-color: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+    </style>
+</head>
+<body>
+    <h1>Neshan Geocoding API Test</h1>
+    
+    <div class="section">
+        <h2>Upload Excel File</h2>
+        <div class="form-group">
+            <label for="excelFile">Select Excel file (.xlsx or .xls):</label>
+            <input type="file" id="excelFile" accept=".xlsx,.xls">
+        </div>
+        <button onclick="uploadExcel()">Upload and Process</button>
+        <div id="uploadResult" class="result" style="display: none;"></div>
+    </div>
+
+    <div class="section">
+        <h2>Geocode Pending Addresses</h2>
+        <button onclick="geocodePending()">Start Geocoding</button>
+        <div id="geocodeResult" class="result" style="display: none;"></div>
+    </div>
+
+    <div class="section">
+        <h2>Get Addresses</h2>
+        <div class="form-group">
+            <label for="statusFilter">Status Filter:</label>
+            <select id="statusFilter">
+                <option value="">All</option>
+                <option value="Pending">Pending</option>
+                <option value="Success">Success</option>
+                <option value="Failed">Failed</option>
+            </select>
+        </div>
+        <button onclick="getAddresses()">Get Addresses</button>
+        <div id="addressesResult" class="result" style="display: none;"></div>
+    </div>
+
+    <div class="section">
+        <h2>Statistics</h2>
+        <button onclick="getStatistics()">Get Statistics</button>
+        <div id="statisticsResult" class="result" style="display: none;"></div>
+    </div>
+
+    <script>
+        const baseUrl = window.location.origin;
+
+        async function uploadExcel() {
+            const fileInput = document.getElementById('excelFile');
+            const resultDiv = document.getElementById('uploadResult');
+            
+            if (!fileInput.files[0]) {
+                showResult(resultDiv, 'Please select a file first.', 'error');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+
+            try {
+                const response = await fetch(`${baseUrl}/api/geocoding/upload-excel`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showResult(resultDiv, `Success: ${result.message}\n\nUploaded ${result.addressesCount} addresses.`, 'success');
+                } else {
+                    showResult(resultDiv, `Error: ${result}`, 'error');
+                }
+            } catch (error) {
+                showResult(resultDiv, `Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function geocodePending() {
+            const resultDiv = document.getElementById('geocodeResult');
+            
+            try {
+                const response = await fetch(`${baseUrl}/api/geocoding/geocode-pending`, {
+                    method: 'POST'
+                });
+
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showResult(resultDiv, `Success: ${result.message}\n\nProcessed: ${result.totalProcessed}\nSuccess: ${result.successCount}\nFailed: ${result.failedCount}`, 'success');
+                } else {
+                    showResult(resultDiv, `Error: ${result}`, 'error');
+                }
+            } catch (error) {
+                showResult(resultDiv, `Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function getAddresses() {
+            const statusFilter = document.getElementById('statusFilter').value;
+            const resultDiv = document.getElementById('addressesResult');
+            
+            try {
+                let url = `${baseUrl}/api/geocoding/addresses?page=1&pageSize=10`;
+                if (statusFilter) {
+                    url += `&status=${statusFilter}`;
+                }
+
+                const response = await fetch(url);
+                const result = await response.json();
+                
+                if (response.ok) {
+                    const addresses = result.addresses.map(addr => 
+                        `ID: ${addr.id}\nAddress: ${addr.fullAddress}\nStatus: ${addr.status}\nLat: ${addr.latitude || 'N/A'}\nLng: ${addr.longitude || 'N/A'}\n---`
+                    ).join('\n');
+                    
+                    showResult(resultDiv, `Found ${result.addresses.length} addresses:\n\n${addresses}`, 'info');
+                } else {
+                    showResult(resultDiv, `Error: ${result}`, 'error');
+                }
+            } catch (error) {
+                showResult(resultDiv, `Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function getStatistics() {
+            const resultDiv = document.getElementById('statisticsResult');
+            
+            try {
+                const response = await fetch(`${baseUrl}/api/geocoding/statistics`);
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showResult(resultDiv, `Statistics:\n\nTotal: ${result.totalAddresses}\nPending: ${result.pendingAddresses}\nSuccess: ${result.successfulAddresses}\nFailed: ${result.failedAddresses}\nSuccess Rate: ${result.successRate.toFixed(2)}%`, 'info');
+                } else {
+                    showResult(resultDiv, `Error: ${result}`, 'error');
+                }
+            } catch (error) {
+                showResult(resultDiv, `Error: ${error.message}`, 'error');
+            }
+        }
+
+        function showResult(element, message, type) {
+            element.textContent = message;
+            element.className = `result ${type}`;
+            element.style.display = 'block';
+        }
+    </script>
+</body>
+</html> 

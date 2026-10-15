@@ -1,0 +1,27 @@
+# Ignore build outputs
+bin/
+obj/
+out/
+
+# Ignore IDE files
+.vs/
+.vscode/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Ignore OS files
+.DS_Store
+Thumbs.db
+
+# Ignore logs
+*.log
+
+# Ignore temporary files
+*.tmp
+*.temp
+
+# Keep the certs directory and certificate file
+!certs/
+!certs/aspnetcore.pfx
